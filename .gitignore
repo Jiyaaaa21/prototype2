@@ -1,0 +1,24 @@
+# Virtual environments
+ven/
+venv/
+.env
+
+# Python
+__pycache__/
+*.pyc
+
+# Datasets
+data/raw/
+data/external/
+
+# Generated reports
+data/outputs/reports/
+
+# Archives
+*.zip
+
+# Jupyter
+.ipynb_checkpoints/
+
+# IDE
+.vscode/

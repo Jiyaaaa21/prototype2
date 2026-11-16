@@ -1,0 +1,3 @@
+delivery_performance,orders,mean_review_score,median_review_score,mean_delivery_variance_days
+Early,88168,4.294150561050117,5.0,-13.011838045218598
+Late,7662,2.566562255285826,2.0,9.446382154717364

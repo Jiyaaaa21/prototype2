@@ -1,0 +1,7 @@
+Component relationship,Measured evidence,Potential model variable,Caution
+Customer ↔ Order & Sales,Orders per underlying customer; customer-level merchandise spend,Observed purchase frequency,Historical repeat behaviour is not automatically a future purchase probability.
+Product ↔ Order & Sales,"Item lines, distinct orders and merchandise value by product/category",Historical product/category demand,No inventory or stockout history is available.
+Seller ↔ Order & Sales,"Seller item lines, distinct orders and merchandise value",Seller sales contribution,"Not seller profit, payout or service quality."
+Order & Sales ↔ Payment,"Order merchandise, freight and recorded payment aggregates",Recorded payment mix and amount,Not a complete accounting reconciliation.
+Order & Sales ↔ Delivery,Purchase-to-delivery duration and actual-vs-estimated date,Historical delivery performance,Observed timestamps do not identify all causes of delay.
+Delivery ↔ Customer Experience,Review score by delivery-performance group,Observed delivery/review association,Association is not causation.
