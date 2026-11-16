@@ -114,11 +114,10 @@ def main():
     verify_neutral_impact(summary)
 
     # Commission should be non-zero under the evidence-backed 20% assumption,
-    # and its base must include NMV plus adjusted freight.
+    # and its base is NMV only (freight excluded).
     scenario_transactions = results["scenario_results"]["scenario"]["transactions"]
     expected_commission = (
         scenario_transactions["net_merchandise_value"]
-        + scenario_transactions["freight_value"]
     ) * SCENARIO_PARAMETERS["commission_rate"]
 
     actual_commission_total = float(scenario_transactions["commission"].sum())
@@ -126,11 +125,11 @@ def main():
 
     assert actual_commission_total > 0, "Commission should be positive at a 20% rate."
     assert abs(actual_commission_total - expected_commission_total) <= 0.01, (
-        "Commission does not reconcile to NMV + adjusted freight."
+        "Commission does not reconcile to NMV (freight excluded)."
     )
 
     print("[PASS] All six business dimensions.")
-    print("[PASS] Commission base = NMV + adjusted freight.")
+    print("[PASS] Commission base = NMV (freight excluded).")
     print(f"[PASS] Commission total: {actual_commission_total:,.2f}")
     print(
         "Independent checks: "

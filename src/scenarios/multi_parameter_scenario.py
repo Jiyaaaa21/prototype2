@@ -495,13 +495,10 @@ class MultiParameterScenarioEngine:
             * seller_cost_rate
         )
 
-        # Historical Olist commission benchmark is applied to the
-        # order value including product value and freight. Freight is
-        # adjusted separately above; commission base is NMV + freight.
-        result["commission_base"] = (
-            result["net_merchandise_value"]
-            + result["freight_value"]
-        )
+        # Olist's published commission is charged on the product value,
+        # not on freight (see config/assumptions.py). The commission base
+        # is therefore net merchandise value; freight is excluded.
+        result["commission_base"] = result["net_merchandise_value"]
         result["commission"] = (
             result["commission_base"] * commission_rate
         )

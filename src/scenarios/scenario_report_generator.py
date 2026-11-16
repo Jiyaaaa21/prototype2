@@ -417,13 +417,13 @@ class ScenarioReportGenerator:
         ])
         limitations.append([
             "Commission",
-            "User-configured rate applied to net merchandise value plus adjusted freight. "
-            "The 20% baseline benchmark is sourced from Olist's documented 2017 fee model; "
-            "it is a historical benchmark, not a measured rate for every seller/order.",
+            "User-configured rate applied to net merchandise value (freight excluded). "
+            "The 20% baseline is a reference rate from published Olist plan pricing; "
+            "it is not a measured rate for every seller/order.",
         ])
         limitations.append([
             "Commission source",
-            "Olist 2017 documented commission model: 20% of the order value including product price and freight. Applied here as a historical benchmark; source period and seller-specific terms may differ.",
+            "Published Olist plan pricing as reported by Exame: 20% (about 2019) and 19-21% depending on plan (2020: Pro 19%, Basic 20%, Lite 21%). Not observed in the Olist transaction dataset. Sources are 2019-2020 press reports, so plan terms during 2016-2018 may differ. The exclusion of freight from the commission base follows secondary sources and has not been confirmed by an Olist primary document.",
         ])
         limitations.append([
             "Seller cost source",
@@ -431,7 +431,7 @@ class ScenarioReportGenerator:
         ])
         limitations.append([
             "Seller payout",
-            "Net merchandise value less commission calculated on net merchandise value plus adjusted freight. "
+            "Net merchandise value less commission calculated on net merchandise value. "
             "Freight is not added as seller payout revenue.",
         ])
         limitations.append([
@@ -751,8 +751,8 @@ class ScenarioReportGenerator:
             "Net merchandise value = gross merchandise value − discount amount.",
             "Freight = historical freight × (1 + freight adjustment).",
             "Seller cost = historical item price × user-configured seller cost rate.",
-            "Commission base = net merchandise value + adjusted freight.",
-            "Commission = commission base × user-configured commission rate; the 20% baseline is an Olist 2017 historical benchmark.",
+            "Commission base = net merchandise value (freight excluded).",
+            "Commission = commission base × user-configured commission rate; the 20% baseline is a reference rate from published Olist plan pricing (19-21% by plan).",
             "Seller payout = net merchandise value − commission (freight is not added to payout).",
             "Seller contribution = seller payout − estimated seller cost.",
         ]
@@ -825,9 +825,9 @@ class ScenarioReportGenerator:
         heading("6. Assumptions and Model Limitations")
         limitations = [
             "Seller cost rate is a proxy derived from IBGE's 2018 retail trade margin rate of 37.6%; cost-to-sales = 1 / (1 + 0.376) = 72.6744%. This is an industry-level proxy, not Olist seller procurement data.",
-            "Baseline commission rate of 20% is based on Olist's documented 2017 fee model. It is applied to net merchandise value plus adjusted freight. It should not be treated as an exact fee for every historical order or seller.",
+            "Baseline commission rate of 20% is a reference rate from published Olist plan pricing (19-21% by plan, reported 2019-2020). It is applied to net merchandise value, excluding freight. It should not be treated as an exact fee for every historical order or seller.",
             "Seller cost is calculated on historical item price, not adjusted price. The IBGE-derived proxy is not an observed seller cost.",
-            "Freight is calculated separately. Adjusted freight is included in the commission base but is not added to seller payout or seller contribution.",
+            "Freight is calculated separately. Freight is excluded from the commission base and is not added to seller payout or seller contribution.",
             "Historical item lines and order volume are held constant.",
             "No demand response, causal price elasticity, or customer behavioural response is estimated.",
             "Delivery outcomes and inventory or stockout effects are not recalculated.",

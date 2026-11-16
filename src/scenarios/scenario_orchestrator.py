@@ -141,9 +141,9 @@ class ScenarioOrchestrator:
             * float(parameters["seller_cost_rate"])
         ).sum()
 
-        # Commission base follows the documented Olist benchmark:
-        # net merchandise value plus adjusted freight.
-        commission_base = net + freight
+        # Commission base: net merchandise value (freight excluded),
+        # consistent with the engine and config/assumptions.py.
+        commission_base = net
         commission = (
             commission_base * float(parameters["commission_rate"])
         )

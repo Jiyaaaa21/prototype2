@@ -90,7 +90,7 @@ def run_scenario(datasets, scenario_name, price_adjustment, output_dir):
     # Validate commission on transaction-level results.
     tx = result["scenario_results"]["scenario"]["transactions"]
     expected_commission = (
-        tx["net_merchandise_value"] + tx["freight_value"]
+        tx["net_merchandise_value"]
     ) * scenario_parameters["commission_rate"]
     actual_total = float(tx["commission"].sum())
     expected_total = float(expected_commission.sum())
@@ -231,7 +231,7 @@ def main():
         ["Freight adjustment", "0% across all scenarios."],
         ["Demand response", "Not modelled. Historical item-line volume is held constant."],
         ["Seller cost basis", "Applied to historical item price; does not increase with adjusted selling price."],
-        ["Commission base", "Net merchandise value plus adjusted freight."],
+        ["Commission base", "Net merchandise value (freight excluded)."],
         ["Interpretation", "Results are conditional model outputs, not forecasts or observed outcomes."],
         ["Currency", "Olist monetary amounts are in Brazilian real (BRL)."],
     ], columns=["item", "description"])

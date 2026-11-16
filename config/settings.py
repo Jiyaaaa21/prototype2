@@ -13,7 +13,6 @@ ORDERS_FILE = DATA_DIR / "olist_orders_dataset.csv"
 ORDER_ITEMS_FILE = DATA_DIR / "olist_order_items_dataset.csv"
 
 CURRENCY = "BRL"
-COMMISSION_RATE = 0.10
 SIMULATION_FREQUENCY = "M"
 HISTORICAL_DATA_IMMUTABLE = True
 

@@ -113,9 +113,9 @@ def main():
         "discount_amount": 22.0,
         "net_merchandise_value": 418.0,
         "seller_cost": 160.0,
-        "commission": 46.6,
-        "seller_payout": 371.4,
-        "seller_contribution": 211.4,
+        "commission": 41.8,
+        "seller_payout": 376.2,
+        "seller_contribution": 216.2,
         "freight_value": 48.0,
     }
 

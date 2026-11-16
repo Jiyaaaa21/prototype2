@@ -1,0 +1,175 @@
+diff --git a/config/settings.py b/config/settings.py
+index 1d0a164..4810633 100644
+--- a/config/settings.py
++++ b/config/settings.py
+@@ -13,7 +13,6 @@ ORDERS_FILE = DATA_DIR / "olist_orders_dataset.csv"
+ ORDER_ITEMS_FILE = DATA_DIR / "olist_order_items_dataset.csv"
+ 
+ CURRENCY = "BRL"
+-COMMISSION_RATE = 0.10
+ SIMULATION_FREQUENCY = "M"
+ HISTORICAL_DATA_IMMUTABLE = True
+ 
+diff --git a/scripts/run_price_sensitivity_analysis.py b/scripts/run_price_sensitivity_analysis.py
+index 5fddb5a..023aa5b 100644
+--- a/scripts/run_price_sensitivity_analysis.py
++++ b/scripts/run_price_sensitivity_analysis.py
+@@ -90,7 +90,7 @@ def run_scenario(datasets, scenario_name, price_adjustment, output_dir):
+     # Validate commission on transaction-level results.
+     tx = result["scenario_results"]["scenario"]["transactions"]
+     expected_commission = (
+-        tx["net_merchandise_value"] + tx["freight_value"]
++        tx["net_merchandise_value"]
+     ) * scenario_parameters["commission_rate"]
+     actual_total = float(tx["commission"].sum())
+     expected_total = float(expected_commission.sum())
+@@ -231,7 +231,7 @@ def main():
+         ["Freight adjustment", "0% across all scenarios."],
+         ["Demand response", "Not modelled. Historical item-line volume is held constant."],
+         ["Seller cost basis", "Applied to historical item price; does not increase with adjusted selling price."],
+-        ["Commission base", "Net merchandise value plus adjusted freight."],
++        ["Commission base", "Net merchandise value (freight excluded)."],
+         ["Interpretation", "Results are conditional model outputs, not forecasts or observed outcomes."],
+         ["Currency", "Olist monetary amounts are in Brazilian real (BRL)."],
+     ], columns=["item", "description"])
+diff --git a/scripts/test_multi_parameter_scenario.py b/scripts/test_multi_parameter_scenario.py
+index 6253029..07debfe 100644
+--- a/scripts/test_multi_parameter_scenario.py
++++ b/scripts/test_multi_parameter_scenario.py
+@@ -113,9 +113,9 @@ def main():
+         "discount_amount": 22.0,
+         "net_merchandise_value": 418.0,
+         "seller_cost": 160.0,
+-        "commission": 46.6,
+-        "seller_payout": 371.4,
+-        "seller_contribution": 211.4,
++        "commission": 41.8,
++        "seller_payout": 376.2,
++        "seller_contribution": 216.2,
+         "freight_value": 48.0,
+     }
+ 
+diff --git a/scripts/test_scenario_orchestrator.py b/scripts/test_scenario_orchestrator.py
+index 65c951b..5ba66b1 100644
+--- a/scripts/test_scenario_orchestrator.py
++++ b/scripts/test_scenario_orchestrator.py
+@@ -114,11 +114,10 @@ def main():
+     verify_neutral_impact(summary)
+ 
+     # Commission should be non-zero under the evidence-backed 20% assumption,
+-    # and its base must include NMV plus adjusted freight.
++    # and its base is NMV only (freight excluded).
+     scenario_transactions = results["scenario_results"]["scenario"]["transactions"]
+     expected_commission = (
+         scenario_transactions["net_merchandise_value"]
+-        + scenario_transactions["freight_value"]
+     ) * SCENARIO_PARAMETERS["commission_rate"]
+ 
+     actual_commission_total = float(scenario_transactions["commission"].sum())
+@@ -126,11 +125,11 @@ def main():
+ 
+     assert actual_commission_total > 0, "Commission should be positive at a 20% rate."
+     assert abs(actual_commission_total - expected_commission_total) <= 0.01, (
+-        "Commission does not reconcile to NMV + adjusted freight."
++        "Commission does not reconcile to NMV (freight excluded)."
+     )
+ 
+     print("[PASS] All six business dimensions.")
+-    print("[PASS] Commission base = NMV + adjusted freight.")
++    print("[PASS] Commission base = NMV (freight excluded).")
+     print(f"[PASS] Commission total: {actual_commission_total:,.2f}")
+     print(
+         "Independent checks: "
+diff --git a/src/scenarios/multi_parameter_scenario.py b/src/scenarios/multi_parameter_scenario.py
+index 95d550d..f6b83c6 100644
+--- a/src/scenarios/multi_parameter_scenario.py
++++ b/src/scenarios/multi_parameter_scenario.py
+@@ -495,13 +495,10 @@ class MultiParameterScenarioEngine:
+             * seller_cost_rate
+         )
+ 
+-        # Historical Olist commission benchmark is applied to the
+-        # order value including product value and freight. Freight is
+-        # adjusted separately above; commission base is NMV + freight.
+-        result["commission_base"] = (
+-            result["net_merchandise_value"]
+-            + result["freight_value"]
+-        )
++        # Olist's published commission is charged on the product value,
++        # not on freight (see config/assumptions.py). The commission base
++        # is therefore net merchandise value; freight is excluded.
++        result["commission_base"] = result["net_merchandise_value"]
+         result["commission"] = (
+             result["commission_base"] * commission_rate
+         )
+diff --git a/src/scenarios/scenario_orchestrator.py b/src/scenarios/scenario_orchestrator.py
+index c4c889b..01ad149 100644
+--- a/src/scenarios/scenario_orchestrator.py
++++ b/src/scenarios/scenario_orchestrator.py
+@@ -141,9 +141,9 @@ class ScenarioOrchestrator:
+             * float(parameters["seller_cost_rate"])
+         ).sum()
+ 
+-        # Commission base follows the documented Olist benchmark:
+-        # net merchandise value plus adjusted freight.
+-        commission_base = net + freight
++        # Commission base: net merchandise value (freight excluded),
++        # consistent with the engine and config/assumptions.py.
++        commission_base = net
+         commission = (
+             commission_base * float(parameters["commission_rate"])
+         )
+diff --git a/src/scenarios/scenario_report_generator.py b/src/scenarios/scenario_report_generator.py
+index 15c468c..6bece0a 100644
+--- a/src/scenarios/scenario_report_generator.py
++++ b/src/scenarios/scenario_report_generator.py
+@@ -417,13 +417,13 @@ class ScenarioReportGenerator:
+         ])
+         limitations.append([
+             "Commission",
+-            "User-configured rate applied to net merchandise value plus adjusted freight. "
+-            "The 20% baseline benchmark is sourced from Olist's documented 2017 fee model; "
+-            "it is a historical benchmark, not a measured rate for every seller/order.",
++            "User-configured rate applied to net merchandise value (freight excluded). "
++            "The 20% baseline is a reference rate from published Olist plan pricing; "
++            "it is not a measured rate for every seller/order.",
+         ])
+         limitations.append([
+             "Commission source",
+-            "Olist 2017 documented commission model: 20% of the order value including product price and freight. Applied here as a historical benchmark; source period and seller-specific terms may differ.",
++            "Published Olist plan pricing as reported by Exame: 20% (about 2019) and 19-21% depending on plan (2020: Pro 19%, Basic 20%, Lite 21%). Not observed in the Olist transaction dataset. Sources are 2019-2020 press reports, so plan terms during 2016-2018 may differ. The exclusion of freight from the commission base follows secondary sources and has not been confirmed by an Olist primary document.",
+         ])
+         limitations.append([
+             "Seller cost source",
+@@ -431,7 +431,7 @@ class ScenarioReportGenerator:
+         ])
+         limitations.append([
+             "Seller payout",
+-            "Net merchandise value less commission calculated on net merchandise value plus adjusted freight. "
++            "Net merchandise value less commission calculated on net merchandise value. "
+             "Freight is not added as seller payout revenue.",
+         ])
+         limitations.append([
+@@ -751,8 +751,8 @@ class ScenarioReportGenerator:
+             "Net merchandise value = gross merchandise value − discount amount.",
+             "Freight = historical freight × (1 + freight adjustment).",
+             "Seller cost = historical item price × user-configured seller cost rate.",
+-            "Commission base = net merchandise value + adjusted freight.",
+-            "Commission = commission base × user-configured commission rate; the 20% baseline is an Olist 2017 historical benchmark.",
++            "Commission base = net merchandise value (freight excluded).",
++            "Commission = commission base × user-configured commission rate; the 20% baseline is a reference rate from published Olist plan pricing (19-21% by plan).",
+             "Seller payout = net merchandise value − commission (freight is not added to payout).",
+             "Seller contribution = seller payout − estimated seller cost.",
+         ]
+@@ -825,9 +825,9 @@ class ScenarioReportGenerator:
+         heading("6. Assumptions and Model Limitations")
+         limitations = [
+             "Seller cost rate is a proxy derived from IBGE's 2018 retail trade margin rate of 37.6%; cost-to-sales = 1 / (1 + 0.376) = 72.6744%. This is an industry-level proxy, not Olist seller procurement data.",
+-            "Baseline commission rate of 20% is based on Olist's documented 2017 fee model. It is applied to net merchandise value plus adjusted freight. It should not be treated as an exact fee for every historical order or seller.",
++            "Baseline commission rate of 20% is a reference rate from published Olist plan pricing (19-21% by plan, reported 2019-2020). It is applied to net merchandise value, excluding freight. It should not be treated as an exact fee for every historical order or seller.",
+             "Seller cost is calculated on historical item price, not adjusted price. The IBGE-derived proxy is not an observed seller cost.",
+-            "Freight is calculated separately. Adjusted freight is included in the commission base but is not added to seller payout or seller contribution.",
++            "Freight is calculated separately. Freight is excluded from the commission base and is not added to seller payout or seller contribution.",
+             "Historical item lines and order volume are held constant.",
+             "No demand response, causal price elasticity, or customer behavioural response is estimated.",
+             "Delivery outcomes and inventory or stockout effects are not recalculated.",
