@@ -33,7 +33,7 @@ from src.simulation.monthly_state_payload_builder import (
 )
 
 from src.dashboard.overview_page import render_overview
-from src.dashboard.theme import apply_theme
+from src.dashboard.theme import apply_theme, brand
 from src.scenarios.scenario_page import render_scenario_page
 
 
@@ -192,11 +192,7 @@ replay_report = twin["replay_report"]
 # SIDEBAR
 # --------------------------------------------------
 
-st.sidebar.markdown(
-    '<div class="brand">Biz<span>Twin</span></div>'
-    '<div class="brand-sub">Commercial &amp; Sales Digital Twin</div>',
-    unsafe_allow_html=True,
-)
+st.sidebar.markdown(brand(), unsafe_allow_html=True)
 
 page = st.sidebar.radio(
     "Navigation",

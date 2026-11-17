@@ -7,7 +7,7 @@ import streamlit as st
 from src.dashboard.component_map import build_component_map, registry_edges
 from src.dashboard.overview_metrics import compute_overview
 from src.dashboard.theme import (
-    COLORS, compact_money, kpi_card, kpi_row, page_header, section, style_fig,
+    COLORS, chart, compact_money, kpi_card, kpi_row, page_header, section, style_fig,
 )
 
 PCT = lambda v: f"{v * 100:.1f}%"
@@ -22,17 +22,17 @@ def render_overview(data: dict, replay_report: dict | None = None) -> None:
     m = _overview(data, f"{len(data['items'])}-{len(data['orders'])}")
     k = m["kpis"]
 
-    page_header("Business Overview", f"{k['first_month']} to {k['last_month']}")
+    page_header("Business Overview", f"{k['first_month']} to {k['last_month']}", "Overview")
 
     kpi_row([
-        kpi_card("Total revenue", compact_money(k["revenue"])),
-        kpi_card("Orders", f"{k['orders']:,}"),
-        kpi_card("Average order value", f"R$ {k['aov']:,.2f}"),
+        kpi_card("Total revenue", compact_money(k["revenue"]), icon="dollar"),
+        kpi_card("Orders", f"{k['orders']:,}", icon="bag"),
+        kpi_card("Average order value", f"R$ {k['aov']:,.2f}", icon="tag"),
     ])
     kpi_row([
-        kpi_card("Customers", f"{k['customers']:,}"),
-        kpi_card("Sellers", f"{k['sellers']:,}"),
-        kpi_card("On-time delivery", PCT(k["on_time_rate"])),
+        kpi_card("Customers", f"{k['customers']:,}", icon="users"),
+        kpi_card("Sellers", f"{k['sellers']:,}", icon="store"),
+        kpi_card("On-time delivery", PCT(k["on_time_rate"]), icon="truck"),
     ])
 
     left, right = st.columns([2, 1])
@@ -48,15 +48,16 @@ def render_overview(data: dict, replay_report: dict | None = None) -> None:
                         hovertemplate="%{x}<br>%{y:,} orders<extra></extra>")
         fig.update_layout(yaxis2=dict(overlaying="y", side="right", showgrid=False,
                                       tickfont=dict(color=COLORS["muted"])))
-        st.plotly_chart(style_fig(fig, 440), use_container_width=True)
+        chart(style_fig(fig, 440))
     with right, st.container(border=True):
         section("Payment methods", basis="observed")
         pt = m["payment_types"]
         fig = go.Figure(go.Pie(labels=pt["payment_type"].str.replace("_", " ").str.title(),
                                values=pt["payment_value"], hole=0.62, sort=False,
-                               marker=dict(line=dict(color=COLORS["panel"], width=2)),
-                               textinfo="percent"))
-        st.plotly_chart(style_fig(fig, 440), use_container_width=True)
+                               marker=dict(colors=[COLORS["blue"], COLORS["cyan"], COLORS["green"], COLORS["amber"], COLORS["violet"]],
+                                           line=dict(color=COLORS["panel"], width=3)),
+                               textinfo="percent", textfont=dict(color="#0A0F1C", size=12)))
+        chart(style_fig(fig, 440))
 
     c1, c2 = st.columns(2)
     with c1, st.container(border=True):
@@ -65,7 +66,7 @@ def render_overview(data: dict, replay_report: dict | None = None) -> None:
         fig = go.Figure(go.Bar(x=cat["merchandise"], y=cat["category"].str.replace("_", " "),
                                orientation="h", marker_color=COLORS["blue"],
                                hovertemplate="%{y}<br>R$ %{x:,.0f}<extra></extra>"))
-        st.plotly_chart(style_fig(fig, 440, legend=False), use_container_width=True)
+        chart(style_fig(fig, 440, legend=False))
     with c2, st.container(border=True):
         section("Top sellers", basis="observed")
         ts = m["top_sellers"].iloc[::-1]
@@ -73,7 +74,7 @@ def render_overview(data: dict, replay_report: dict | None = None) -> None:
                                marker_color=COLORS["cyan"], customdata=ts["orders"],
                                hovertemplate="Seller %{y}<br>R$ %{x:,.0f}<br>"
                                              "%{customdata:,} orders<extra></extra>"))
-        st.plotly_chart(style_fig(fig, 440, legend=False), use_container_width=True)
+        chart(style_fig(fig, 440, legend=False))
 
     d1, d2 = st.columns(2)
     with d1, st.container(border=True):
@@ -83,7 +84,7 @@ def render_overview(data: dict, replay_report: dict | None = None) -> None:
                                    line=dict(color=COLORS["green"], width=2.5),
                                    hovertemplate="%{x}<br>%{y:.1f}% on time<extra></extra>"))
         fig.update_yaxes(ticksuffix="%", range=[0, 100])
-        st.plotly_chart(style_fig(fig, 420, legend=False), use_container_width=True)
+        chart(style_fig(fig, 420, legend=False))
     with d2, st.container(border=True):
         section("Review score by delivery time", basis="observed")
         rb = m["review_by_delivery"]
@@ -92,9 +93,8 @@ def render_overview(data: dict, replay_report: dict | None = None) -> None:
                                hovertemplate="%{x}<br>%{y:.2f} average<br>"
                                              "%{customdata:,} orders<extra></extra>"))
         fig.update_yaxes(range=[1, 5])
-        st.plotly_chart(style_fig(fig, 420, legend=False), use_container_width=True)
+        chart(style_fig(fig, 420, legend=False))
 
     with st.container(border=True):
         section("Business components")
-        st.plotly_chart(build_component_map(registry_edges(), height=540),
-                        use_container_width=True)
+        chart(build_component_map(registry_edges(), height=540))

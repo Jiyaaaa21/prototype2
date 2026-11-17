@@ -15,9 +15,10 @@ import plotly.graph_objects as go
 import streamlit as st
 
 from config.assumptions import ASSUMPTIONS, get_baseline_parameters
+from config.evidence import BIJMOLT_2005, EVIDENCE, LITERATURE_ELASTICITIES, TELLIS_1988
 from src.dashboard.component_map import build_component_map
 from src.dashboard.theme import (
-    COLORS, compact_money, kpi_card, kpi_row, page_header, section, style_fig,
+    COLORS, chart, compact_money, kpi_card, kpi_row, page_header, section, style_fig,
 )
 from src.scenarios.demand_response import break_even_elasticity
 from src.scenarios.product_analysis import (
@@ -32,10 +33,16 @@ DEFAULT_PRODUCT = "53b36df67ebb7c41585e8d54d6772e08"   # watches_gifts, 3 seller
 PRESETS = {
     "Custom": {},
     "Price increase +10%": {"price": 10.0},
-    "Price increase +10% with demand response (assumed elasticity -1.0)": {
-        "price": 10.0, "elasticity": -1.0},
+    "Price increase +10% (elasticity -1.76, Tellis 1988 mean)": {
+        "price": 10.0, "elasticity": TELLIS_1988},
+    "Price increase +10% (elasticity -2.62, Bijmolt et al. 2005 mean)": {
+        "price": 10.0, "elasticity": BIJMOLT_2005},
     "Promotion: 15% discount": {"discount": 15.0},
+    "Promotion: 15% discount (elasticity -2.62, Bijmolt et al. 2005 mean)": {
+        "discount": 15.0, "elasticity": BIJMOLT_2005},
     "Freight subsidy: -50% shipping charge": {"freight": -50.0},
+    "Freight subsidy: -50% (elasticity -1.76, Tellis 1988 mean)": {
+        "freight": -50.0, "elasticity": TELLIS_1988},
     "Seller moves to Lite plan (21% commission)": {"commission": 21.0},
     "Combined: price +5%, discount 5%, freight -10%": {
         "price": 5.0, "discount": 5.0, "freight": -10.0},
@@ -91,13 +98,19 @@ def _apply_preset() -> None:
 
 def _scenario_parameters() -> dict:
     s = st.session_state
+    base = get_baseline_parameters()
+    cost = s["sc_cost"] / 100
+    # the slider shows the baseline rounded to 2 decimals; an untouched slider must
+    # use the exact baseline, otherwise rounding creates a phantom change
+    if abs(s["sc_cost"] - round(base["seller_cost_rate"] * 100, 2)) < 1e-9:
+        cost = base["seller_cost_rate"]
     return {
-        **get_baseline_parameters(),
+        **base,
         "product_price_adjustment": s["sc_price"] / 100,
         "discount_rate": s["sc_discount"] / 100,
         "freight_adjustment": s["sc_freight"] / 100,
         "commission_rate": s["sc_commission"] / 100,
-        "seller_cost_rate": s["sc_cost"] / 100,
+        "seller_cost_rate": cost,
     }
 
 
@@ -171,27 +184,27 @@ def _result_cards(out: dict) -> list[str]:
     steps = _steps(out["chain"])
     cards = []
 
-    def card(label, key, sub="", is_count=False, with_pct=True):
+    def card(label, key, sub="", is_count=False, with_pct=True, icon=""):
         s_ = steps[key]
         flat = abs(s_["change"]) < 0.005
         direction = "flat" if flat else ("up" if s_["change"] > 0 else "down")
         val = f"{s_['scenario']:,.0f}" if is_count else compact_money(s_["scenario"])
         return kpi_card(label, val, sub,
-                        _delta_text(s_["change"], _pct(s_), is_count, with_pct), direction)
+                        _delta_text(s_["change"], _pct(s_), is_count, with_pct), direction, icon)
 
     ov = steps["Order value (all orders with items)"]
     orders = steps["Orders"]
     sub = (f"Orders {orders['baseline']:,.0f} to {orders['scenario']:,.0f}"
            if abs(orders["change"]) > 0.5 else f"Orders {orders['baseline']:,.0f}")
-    cards.append(card("Customer order value", ov["stage"], sub))
-    cards.append(card("Platform commission", "Platform commission"))
-    cards.append(card("Seller payout", "Seller payout"))
+    cards.append(card("Customer order value", ov["stage"], sub, icon="bag"))
+    cards.append(card("Platform commission", "Platform commission", icon="percent"))
+    cards.append(card("Seller payout", "Seller payout", icon="trend"))
     nmv = steps["Net merchandise value"]
     mg = steps["Seller margin (proxy)"]
     rate_b = mg["baseline"] / nmv["baseline"] * 100 if nmv["baseline"] else 0
     rate_s = mg["scenario"] / nmv["scenario"] * 100 if nmv["scenario"] else 0
     cards.append(card("Seller margin (proxy)", "Seller margin (proxy)",
-                      f"Margin rate {rate_b:.1f}% to {rate_s:.1f}%", with_pct=False))
+                      f"Margin rate {rate_b:.1f}% to {rate_s:.1f}%", with_pct=False, icon="pie"))
     return cards
 
 
@@ -281,15 +294,18 @@ def _break_even_table(out: dict) -> pd.DataFrame | None:
         return None
     bs = out["engine"]["baseline"]["summary"]
     ss = out["engine"]["scenario"]["summary"]
+    cols = {f"Change at {e:.2f} ({name})": e for name, e in LITERATURE_ELASTICITIES.items()}
     rows = []
-    for label in BREAK_EVEN_METRICS:
-        keys = SENSITIVITY_METRICS[label]
+    for label, keys in SENSITIVITY_METRICS.items():
         b, s_ = sum(bs[k] for k in keys), sum(ss[k] for k in keys)
         if b <= 0 or s_ <= 0:
             continue
         e = break_even_elasticity(s_ / b, f)
-        rows.append({"Metric": label,
-                     "Break-even elasticity": "none" if e is None or e > 0 else f"{e:.2f}"})
+        row = {"Metric": label,
+               "Break-even elasticity": "none" if e is None or e > 0 else f"{e:.2f}"}
+        for name, ev in cols.items():
+            row[name] = f"{((s_ * f ** ev) / b - 1) * 100:+.1f}%"
+        rows.append(row)
     return pd.DataFrame(rows) if rows else None
 
 
@@ -299,7 +315,7 @@ def _sensitivity_frame(out: dict) -> pd.DataFrame | None:
         return None
     bs = out["engine"]["baseline"]["summary"]
     ss = out["engine"]["scenario"]["summary"]
-    grid = np.round(np.arange(0.0, -3.01, -0.1), 2)
+    grid = np.round(np.arange(0.0, -4.01, -0.1), 2)
     data = {}
     for label, keys in SENSITIVITY_METRICS.items():
         b, s_ = sum(bs[k] for k in keys), sum(ss[k] for k in keys)
@@ -314,7 +330,11 @@ def _sensitivity_figure(sens: pd.DataFrame, current: float):
         fig.add_scatter(x=sens.index, y=sens[col], name=col, mode="lines",
                         hovertemplate=f"{col}<br>elasticity %{{x}}<br>%{{y:+.1f}}%<extra></extra>")
     fig.add_hline(y=0, line=dict(color=COLORS["muted"], width=1, dash="dot"))
-    if current != 0:
+    for name, e in LITERATURE_ELASTICITIES.items():
+        fig.add_vline(x=e, line=dict(color=COLORS["slate"], width=1.2, dash="dot"),
+                      annotation_text=name, annotation_position="top",
+                      annotation_font=dict(color=COLORS["muted"], size=10))
+    if current != 0 and all(abs(current - e) > 1e-9 for e in LITERATURE_ELASTICITIES.values()):
         fig.add_vline(x=current, line=dict(color=COLORS["amber"], width=1.5, dash="dash"),
                       annotation_text="assumed", annotation_font_color=COLORS["amber"])
     fig.update_xaxes(title="Assumed price elasticity (more negative = customers react more)")
@@ -352,7 +372,7 @@ def _render_comparison() -> None:
                         hovertemplate=f"{name}<br>%{{x}}<br>%{{y:+.1f}}%<extra></extra>")
         fig.update_layout(barmode="group")
         fig.update_yaxes(ticksuffix="%", title="Change vs baseline")
-        st.plotly_chart(style_fig(fig, 420), use_container_width=True)
+        chart(style_fig(fig, 420))
         st.dataframe(shown, use_container_width=True)
         if st.button("Clear saved scenarios"):
             st.session_state["saved_scenarios"] = {}
@@ -367,11 +387,11 @@ def _profile_section(sim_data: dict) -> None:
         section("Product profile", basis="observed")
         kpi_row([
             kpi_card("Baseline order value", compact_money(p["order_value"]),
-                     f"{p['first_month']} to {p['last_month']}"),
-            kpi_card("Orders", f"{p['orders']:,}", f"{p['sellers']} sellers"),
+                     f"{p['first_month']} to {p['last_month']}", icon="bag"),
+            kpi_card("Orders", f"{p['orders']:,}", f"{p['sellers']} sellers", icon="layers"),
             kpi_card("Average price", f"R$ {p['avg_price']:,.2f}",
-                     f"R$ {p['price_min']:,.2f} to R$ {p['price_max']:,.2f}"),
-            kpi_card("Freight share", f"{p['freight_share'] * 100:.1f}%", "of order value"),
+                     f"R$ {p['price_min']:,.2f} to R$ {p['price_max']:,.2f}", icon="tag"),
+            kpi_card("Freight share", f"{p['freight_share'] * 100:.1f}%", "of order value", icon="truck"),
         ])
         h = p["history"]
         fig = go.Figure()
@@ -383,7 +403,7 @@ def _profile_section(sim_data: dict) -> None:
                         hovertemplate="%{x}<br>R$ %{y:,.2f}<extra></extra>")
         fig.update_layout(yaxis2=dict(overlaying="y", side="right", showgrid=False,
                                       tickfont=dict(color=COLORS["muted"])))
-        st.plotly_chart(style_fig(fig, 380), use_container_width=True)
+        chart(style_fig(fig, 380))
 
 
 def _portfolio_section(data: dict, out: dict) -> None:
@@ -407,7 +427,7 @@ def _portfolio_section(data: dict, out: dict) -> None:
                           for v in top["order_value_change"]],
             hovertemplate="%{y}<br>R$ %{x:,.0f}<extra></extra>"))
         fig.update_xaxes(title="Change in customer order value (R$)")
-        st.plotly_chart(style_fig(fig, 460, legend=False), use_container_width=True)
+        chart(style_fig(fig, 460, legend=False))
         table = pd.DataFrame({
             "Category": res["category"].str.replace("_", " "),
             "Product": res["product_id"].str[:8],
@@ -423,10 +443,28 @@ def _portfolio_section(data: dict, out: dict) -> None:
         st.dataframe(table, hide_index=True, use_container_width=True)
 
 
+def _price_bounds(sim_data: dict, scope: dict | None) -> tuple[float, float, str]:
+    """
+    Price-change limits for the scope. For one product they follow the prices the
+    product has actually sold at (so a scenario does not extrapolate beyond observed
+    prices); for wider scopes they are +/-30%. Always at least +/-10% so presets fit.
+    """
+    if scope is None or "product_id" not in scope:
+        return -30.0, 30.0, ""
+    p = sim_data["items"]["price"]
+    avg, lo_p, hi_p = float(p.mean()), float(p.min()), float(p.max())
+    lo = float(np.floor((lo_p / avg - 1) * 100 / 5) * 5)
+    hi = float(np.ceil((hi_p / avg - 1) * 100 / 5) * 5)
+    lo, hi = max(min(lo, -10.0), -50.0), min(max(hi, 10.0), 50.0)
+    hint = (f"Observed prices for this product range from R\\$ {lo_p:,.2f} to "
+            f"R\\$ {hi_p:,.2f} (average R\\$ {avg:,.2f}).")
+    return lo, hi, hint
+
+
 # -------------------------------------------------------------------- page
 def render_scenario_page(data: dict, report_dir) -> None:
     _init_state()
-    page_header("Scenario Analysis", "")
+    page_header("Scenario Analysis", "", "Scenario lab")
 
     with st.container(border=True):
         section("Product")
@@ -447,24 +485,29 @@ def render_scenario_page(data: dict, report_dir) -> None:
                     on_change=_apply_preset)
         b.text_input("Scenario name", key="sc_name")
         c1, c2, c3 = st.columns(3)
-        c1.slider("Product price change (%)", -30.0, 30.0, step=0.5, key="sc_price")
+        lo, hi, hint = _price_bounds(sim_data, scope)
+        st.session_state["sc_price"] = min(max(st.session_state["sc_price"], lo), hi)
+        c1.slider("Product price change (%)", lo, hi, step=0.5, key="sc_price",
+                  help=hint or None)
         c2.slider("Discount on products (%)", 0.0, 30.0, step=0.5, key="sc_discount")
         c3.slider("Freight charge change (%)", -100.0, 50.0, step=1.0, key="sc_freight")
         c4, c5, c6 = st.columns(3)
-        c4.slider("Platform commission (%)", 0.0, 30.0, step=0.5, key="sc_commission",
+        c4.slider("Platform commission (%)", 10.0, 30.0, step=0.5, key="sc_commission",
                   help="Published range 19-21% by seller plan. Charged on product "
                        "value, freight excluded.")
-        c5.slider("Seller cost rate (%)", 50.0, 90.0, step=0.5, key="sc_cost",
+        c5.slider("Seller cost rate (%)", 60.0, 85.0, step=0.1, key="sc_cost",
                   help="External retail-margin proxy, not an Olist-observed cost.")
-        c6.slider("Price elasticity (assumption)", -3.0, 0.0, step=0.1, key="sc_elasticity",
-                  help="Not estimated from Olist. Customers react to price plus freight. "
-                       "One value for the whole scope. 0 keeps volumes at their "
-                       "historical values.")
+        c6.slider("Price elasticity (assumption)", -4.0, 0.0, step=0.01, key="sc_elasticity",
+                  help="Not estimated from Olist. Published means: -1.76 (Tellis 1988), "
+                       "-2.62 (Bijmolt et al. 2005). Customers react to price plus "
+                       "freight. One value for the whole scope. 0 keeps volumes at "
+                       "their historical values.")
         with st.expander("Assumptions and sources"):
             st.dataframe(pd.DataFrame([{
                 "Parameter": a_.label, "Baseline": round(a_.baseline, 4),
                 "Status": STATUS_LABEL[a_.status], "Source": a_.source,
             } for a_ in ASSUMPTIONS.values()]), hide_index=True, use_container_width=True)
+            st.dataframe(pd.DataFrame(EVIDENCE), hide_index=True, use_container_width=True)
         run = st.button("Run Scenario", type="primary")
 
     if run:
@@ -488,24 +531,24 @@ def render_scenario_page(data: dict, report_dir) -> None:
     status = (f"Reconciliation {len(chain['checks'])}/{len(chain['checks'])} passed"
               if not failed else f"Reconciliation failed: {failed}")
     page_header(f"Results: {out['name']}",
-                f"Totals for {_period(sim_data['orders'])}  |  {basis}  |  {status}")
+                f"Totals for {_period(sim_data['orders'])}  |  {basis}  |  {status}", "Results")
     kpi_row(_result_cards(out))
 
     with st.container(border=True):
         section("How the change travels")
-        st.plotly_chart(_propagation_map(chain), use_container_width=True)
+        chart(_propagation_map(chain))
 
     left, right = st.columns(2)
     with left, st.container(border=True):
         section("Impact by seller", basis="counterfactual")
-        st.plotly_chart(_seller_figure(out), use_container_width=True)
+        chart(_seller_figure(out))
     with right, st.container(border=True):
         section("Impact over time", basis="counterfactual")
-        st.plotly_chart(_month_figure(out), use_container_width=True)
+        chart(_month_figure(out))
 
     with st.container(border=True):
         section("Baseline vs scenario", basis="counterfactual")
-        st.plotly_chart(_baseline_vs_scenario(chain), use_container_width=True)
+        chart(_baseline_vs_scenario(chain))
 
     be = _break_even_table(out)
     if be is not None:
@@ -517,8 +560,7 @@ def render_scenario_page(data: dict, report_dir) -> None:
             with r2:
                 sens = _sensitivity_frame(out)
                 if sens is not None:
-                    st.plotly_chart(_sensitivity_figure(sens, out["elasticity"]),
-                                    use_container_width=True)
+                    chart(_sensitivity_figure(sens, out["elasticity"]))
 
     if scope is not None:
         _portfolio_section(data, out)

@@ -78,7 +78,7 @@ def build_component_map(edges, node_notes: dict | None = None,
                                  hoverinfo="skip", showlegend=False))
         fig.add_annotation(x=ex, y=ey, ax=ex - ux * 16 / kx, ay=ey - uy * 16 / ky,
                            xref="x", yref="y", axref="x", ayref="y",
-                           showarrow=True, arrowhead=2, arrowsize=1.5,
+                           showarrow=True, arrowhead=2, arrowsize=1.1,
                            arrowwidth=max(width - 0.4, 1.4), arrowcolor=color)
 
     for name, label in NODES.items():

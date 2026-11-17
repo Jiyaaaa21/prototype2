@@ -6,68 +6,149 @@ import html
 import streamlit as st
 
 COLORS = {
-    "bg": "#0B1220", "panel": "#111A2E", "border": "#1E293B",
-    "text": "#E2E8F0", "muted": "#94A3B8",
-    "blue": "#2F81F7", "cyan": "#22D3EE", "green": "#3FB950",
-    "amber": "#D29922", "red": "#F85149", "slate": "#475569",
+    "bg": "#0A0F1C", "panel": "#111827", "panel2": "#0F172A", "border": "#1F2937",
+    "text": "#E5E7EB", "muted": "#9CA3AF", "dim": "#6B7280",
+    "blue": "#3B82F6", "cyan": "#22D3EE", "green": "#34D399",
+    "amber": "#FBBF24", "red": "#F87171", "slate": "#4B5563", "violet": "#A78BFA",
 }
 COLORWAY = [COLORS["blue"], COLORS["cyan"], COLORS["green"],
-            COLORS["amber"], "#A78BFA", "#F472B6"]
+            COLORS["amber"], COLORS["violet"], "#F472B6"]
 
-TAGS = {  # basis labels shown next to figures
+TAGS = {
     "observed": ("Observed", "obs"),
     "external": ("External source", "ext"),
     "assumption": ("User assumption", "asm"),
     "counterfactual": ("What-if", "cf"),
 }
 
+_ICONS = {  # 24x24 stroke icons
+    "dollar": '<line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>',
+    "bag": '<path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 0 1-8 0"/>',
+    "tag": '<path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/>',
+    "users": '<path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>',
+    "store": '<rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/>',
+    "truck": '<rect x="1" y="3" width="15" height="13"/><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/>',
+    "percent": '<line x1="19" y1="5" x2="5" y2="19"/><circle cx="6.5" cy="6.5" r="2.5"/><circle cx="17.5" cy="17.5" r="2.5"/>',
+    "pie": '<path d="M21.21 15.89A10 10 0 1 1 8 2.83"/><path d="M22 12A10 10 0 0 0 12 2v10z"/>',
+    "trend": '<polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/>',
+    "layers": '<polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/>',
+}
+
 _CSS = f"""
 <style>
-html, body, [class*="css"] {{
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+html, body, [class*="css"], .stApp {{
   font-family: Inter, "Segoe UI", system-ui, -apple-system, sans-serif;
+  -webkit-font-smoothing: antialiased;
 }}
-.stApp {{ background: {COLORS['bg']}; color: {COLORS['text']}; }}
-.block-container {{ padding-top: 4.6rem; padding-bottom: 4rem; max-width: 1400px; }}
-[data-testid="stVerticalBlock"] {{ gap: 1.4rem; }}
-[data-testid="stSidebar"] {{
-  background: #0F172A; border-right: 1px solid {COLORS['border']};
+.stApp {{
+  color: {COLORS['text']};
+  background:
+    radial-gradient(1100px 520px at 85% -8%, rgba(59,130,246,.13), transparent 60%),
+    radial-gradient(900px 480px at -5% 105%, rgba(34,211,238,.07), transparent 60%),
+    {COLORS['bg']};
 }}
+header[data-testid="stHeader"] {{ background: transparent; }}
 [data-testid="stAppDeployButton"], .stDeployButton {{ display: none; }}
-h1, h2, h3 {{ letter-spacing: -0.01em; color: {COLORS['text']}; }}
-.page-title {{ font-size: 1.9rem; font-weight: 700; margin: 0 0 .2rem 0; }}
-.page-sub {{ color: {COLORS['muted']}; font-size: .92rem; margin-bottom: 1.1rem; }}
-.brand {{ font-size: 1.15rem; font-weight: 700; color: {COLORS['text']}; }}
-.brand span {{ color: {COLORS['cyan']}; }}
-.brand-sub {{ color: {COLORS['muted']}; font-size: .78rem; margin-bottom: 1rem; }}
-.kpi {{
-  background: {COLORS['panel']}; border: 1px solid {COLORS['border']};
-  border-radius: 14px; padding: 24px 26px; height: 100%;
-  border-top: 2px solid {COLORS['blue']};
+.block-container {{ padding-top: 4.2rem; padding-bottom: 4rem; max-width: 1400px; }}
+[data-testid="stVerticalBlock"] {{ gap: 1.4rem; }}
+::-webkit-scrollbar {{ width: 8px; height: 8px; }}
+::-webkit-scrollbar-thumb {{ background: #243044; border-radius: 8px; }}
+
+/* ---------- sidebar ---------- */
+[data-testid="stSidebar"] {{
+  background: linear-gradient(180deg, #0C1324 0%, #0A101E 100%);
+  border-right: 1px solid {COLORS['border']};
 }}
-.kpi-label {{ color: {COLORS['muted']}; font-size: .75rem; text-transform: uppercase;
-  letter-spacing: .06em; }}
-.kpi-value {{ font-size: 2.1rem; font-weight: 700; margin: 8px 0 6px 0;
-  color: {COLORS['text']}; }}
-.kpi-sub {{ color: {COLORS['muted']}; font-size: .76rem; }}
-.kpi-delta {{ font-size: .95rem; font-weight: 600; margin-bottom: 2px; }}
-.kpi-delta.up {{ color: {COLORS['green']}; }}
-.kpi-delta.down {{ color: {COLORS['red']}; }}
-.kpi-delta.flat {{ color: {COLORS['muted']}; }}
-.sec-title {{ font-size: 1.08rem; font-weight: 600; margin: 0; color: {COLORS['text']}; }}
-.sec-note {{ color: {COLORS['muted']}; font-size: .78rem; margin: 2px 0 6px 0; }}
-.tag {{ display: inline-block; font-size: .68rem; font-weight: 600; padding: 2px 8px;
-  border-radius: 999px; margin-left: 8px; vertical-align: middle; }}
-.tag.obs {{ background: rgba(63,185,80,.15); color: {COLORS['green']}; }}
-.tag.ext {{ background: rgba(47,129,247,.15); color: {COLORS['blue']}; }}
-.tag.asm {{ background: rgba(210,153,34,.18); color: {COLORS['amber']}; }}
-.tag.cf  {{ background: rgba(148,163,184,.18); color: {COLORS['muted']}; }}
+.brand {{ display: flex; align-items: center; gap: 12px; margin: 6px 0 2px 0; }}
+.brand-logo {{
+  width: 38px; height: 38px; border-radius: 11px; display: grid; place-items: center;
+  background: linear-gradient(135deg, {COLORS['blue']}, {COLORS['cyan']});
+  color: #fff; font-weight: 700; font-size: .95rem; letter-spacing: .02em;
+  box-shadow: 0 6px 18px rgba(59,130,246,.35);
+}}
+.brand-name {{ font-size: 1.12rem; font-weight: 700; line-height: 1.1; }}
+.brand-sub {{ color: {COLORS['dim']}; font-size: .74rem; margin-top: 2px; }}
+.nav-label {{ color: {COLORS['dim']}; font-size: .68rem; letter-spacing: .12em;
+  text-transform: uppercase; margin: 26px 0 6px 6px; }}
+[data-testid="stSidebar"] [role="radiogroup"] {{ gap: 4px; }}
+[data-testid="stSidebar"] label[data-baseweb="radio"] {{
+  padding: 10px 14px; border-radius: 11px; margin: 0; width: 100%;
+  border: 1px solid transparent; transition: background .15s, border-color .15s;
+}}
+[data-testid="stSidebar"] label[data-baseweb="radio"] > div:first-child {{ display: none; }}
+[data-testid="stSidebar"] label[data-baseweb="radio"]:hover {{ background: rgba(255,255,255,.04); }}
+[data-testid="stSidebar"] label[data-baseweb="radio"]:has(input:checked) {{
+  background: rgba(59,130,246,.14); border-color: rgba(59,130,246,.35);
+}}
+[data-testid="stSidebar"] label[data-baseweb="radio"] p {{ font-weight: 500; }}
+
+/* ---------- headings ---------- */
+h1, h2, h3 {{ letter-spacing: -0.015em; color: {COLORS['text']}; }}
+.eyebrow {{ color: {COLORS['cyan']}; font-size: .72rem; font-weight: 600;
+  letter-spacing: .14em; text-transform: uppercase; margin-bottom: 6px; }}
+.page-title {{ font-size: 2rem; font-weight: 700; letter-spacing: -0.02em; margin: 0 0 .25rem 0; }}
+.page-sub {{ color: {COLORS['muted']}; font-size: .92rem; margin-bottom: 1.2rem; }}
+.sec-title {{ font-size: 1.06rem; font-weight: 600; margin: 0 0 4px 0; color: {COLORS['text']}; }}
+
+/* ---------- KPI cards ---------- */
+.kpi {{
+  background: linear-gradient(180deg, rgba(255,255,255,.035), rgba(255,255,255,.012)), {COLORS['panel']};
+  border: 1px solid {COLORS['border']}; border-radius: 16px; padding: 22px 24px; height: 100%;
+  box-shadow: 0 10px 28px rgba(0,0,0,.28), inset 0 1px 0 rgba(255,255,255,.04);
+  transition: transform .18s ease, border-color .18s ease;
+}}
+.kpi:hover {{ transform: translateY(-2px); border-color: rgba(59,130,246,.45); }}
+.kpi-top {{ display: flex; justify-content: space-between; align-items: center; }}
+.kpi-label {{ color: {COLORS['muted']}; font-size: .74rem; font-weight: 500;
+  text-transform: uppercase; letter-spacing: .08em; }}
+.kpi-icon {{ width: 36px; height: 36px; border-radius: 10px; display: grid; place-items: center;
+  background: rgba(59,130,246,.14); color: {COLORS['cyan']}; }}
+.kpi-icon svg {{ width: 18px; height: 18px; fill: none; stroke: currentColor;
+  stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }}
+.kpi-value {{ font-size: 2.15rem; font-weight: 700; letter-spacing: -0.02em; margin: 14px 0 10px 0; }}
+.kpi-foot {{ display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }}
+.chip {{ font-size: .8rem; font-weight: 600; padding: 3px 10px; border-radius: 999px; }}
+.chip.up {{ background: rgba(52,211,153,.14); color: {COLORS['green']}; }}
+.chip.down {{ background: rgba(248,113,113,.14); color: {COLORS['red']}; }}
+.chip.flat {{ background: rgba(156,163,175,.14); color: {COLORS['muted']}; }}
+.kpi-sub {{ color: {COLORS['dim']}; font-size: .78rem; }}
+
+/* ---------- basis tags ---------- */
+.tag {{ display: inline-block; font-size: .66rem; font-weight: 600; padding: 3px 9px;
+  border-radius: 999px; margin-left: 10px; vertical-align: middle; letter-spacing: .02em; }}
+.tag.obs {{ background: rgba(52,211,153,.13); color: {COLORS['green']}; }}
+.tag.ext {{ background: rgba(59,130,246,.15); color: {COLORS['blue']}; }}
+.tag.asm {{ background: rgba(251,191,36,.14); color: {COLORS['amber']}; }}
+.tag.cf  {{ background: rgba(156,163,175,.14); color: {COLORS['muted']}; }}
+
+/* ---------- containers, inputs, buttons ---------- */
 div[data-testid="stVerticalBlockBorderWrapper"] {{
-  background: {COLORS['panel']}; border-radius: 14px;
-  border: 1px solid {COLORS['border']}; padding: 14px 18px 10px 18px;
+  background: linear-gradient(180deg, rgba(255,255,255,.028), rgba(255,255,255,.008)), {COLORS['panel']};
+  border: 1px solid {COLORS['border']}; border-radius: 16px; padding: 16px 20px 12px 20px;
+  box-shadow: 0 10px 28px rgba(0,0,0,.25), inset 0 1px 0 rgba(255,255,255,.035);
+}}
+[data-testid="stExpander"] {{
+  border: 1px solid {COLORS['border']}; border-radius: 12px; background: rgba(15,23,42,.55);
+}}
+[data-baseweb="select"] > div, [data-baseweb="input"], [data-baseweb="base-input"] {{
+  background: {COLORS['panel2']} !important; border-radius: 10px !important;
+}}
+[data-baseweb="select"] > div, [data-baseweb="input"] {{ border: 1px solid {COLORS['border']} !important; }}
+.stButton > button, .stDownloadButton > button {{
+  border-radius: 10px; border: 1px solid {COLORS['border']}; background: {COLORS['panel2']};
+  color: {COLORS['text']}; font-weight: 500; padding: .5rem 1.1rem; transition: all .15s ease;
+}}
+.stButton > button:hover, .stDownloadButton > button:hover {{
+  border-color: {COLORS['blue']}; color: #fff; transform: translateY(-1px);
 }}
 .stButton > button[kind="primary"] {{
-  background: {COLORS['blue']}; border: 0; border-radius: 10px; font-weight: 600;
+  background: linear-gradient(135deg, {COLORS['blue']}, #2563EB); border: 0; color: #fff;
+  font-weight: 600; box-shadow: 0 8px 20px rgba(59,130,246,.35);
 }}
+.stButton > button[kind="primary"]:hover {{ filter: brightness(1.08); }}
+[data-testid="stSlider"] label p {{ color: {COLORS['muted']}; font-size: .86rem; }}
+[data-testid="stAlert"] {{ border-radius: 12px; }}
 </style>
 """
 
@@ -76,14 +157,26 @@ def apply_theme() -> None:
     st.markdown(_CSS, unsafe_allow_html=True)
 
 
+def _safe(text: str) -> str:
+    return html.escape(text).replace("$", "&#36;")
+
+
 def tag(kind: str) -> str:
     label, css = TAGS[kind]
     return f'<span class="tag {css}">{label}</span>'
 
 
-def page_header(title: str, subtitle: str) -> None:
+def brand() -> str:
+    return ('<div class="brand"><div class="brand-logo">BT</div><div>'
+            '<div class="brand-name">BizTwin</div>'
+            '<div class="brand-sub">Commercial &amp; Sales Digital Twin</div></div></div>'
+            '<div class="nav-label">Navigation</div>')
+
+
+def page_header(title: str, subtitle: str, eyebrow: str = "") -> None:
+    top = f'<div class="eyebrow">{_safe(eyebrow)}</div>' if eyebrow else ""
     sub = f'<div class="page-sub">{_safe(subtitle)}</div>' if subtitle else ""
-    st.markdown(f'<div class="page-title">{_safe(title)}</div>{sub}',
+    st.markdown(f'{top}<div class="page-title">{_safe(title)}</div>{sub}',
                 unsafe_allow_html=True)
 
 
@@ -93,16 +186,15 @@ def section(title: str, note: str = "", basis: str | None = None) -> None:
                 unsafe_allow_html=True)
 
 
-def _safe(text: str) -> str:
-    return html.escape(text).replace("$", "&#36;")
-
-
 def kpi_card(label: str, value: str, sub: str = "", delta: str = "",
-             delta_dir: str = "flat") -> str:
-    d = f'<div class="kpi-delta {delta_dir}">{_safe(delta)}</div>' if delta else ""
-    s = f'<div class="kpi-sub">{_safe(sub)}</div>' if sub else ""
-    return (f'<div class="kpi"><div class="kpi-label">{_safe(label)}</div>'
-            f'<div class="kpi-value">{_safe(value)}</div>{d}{s}</div>')
+             delta_dir: str = "flat", icon: str = "") -> str:
+    ico = (f'<div class="kpi-icon"><svg viewBox="0 0 24 24">{_ICONS[icon]}</svg></div>'
+           if icon in _ICONS else "")
+    chip = f'<span class="chip {delta_dir}">{_safe(delta)}</span>' if delta else ""
+    s = f'<span class="kpi-sub">{_safe(sub)}</span>' if sub else ""
+    foot = f'<div class="kpi-foot">{chip}{s}</div>' if (chip or s) else ""
+    return (f'<div class="kpi"><div class="kpi-top"><span class="kpi-label">{_safe(label)}</span>'
+            f'{ico}</div><div class="kpi-value">{_safe(value)}</div>{foot}</div>')
 
 
 def kpi_row(cards: list[str]) -> None:
@@ -111,19 +203,30 @@ def kpi_row(cards: list[str]) -> None:
 
 
 def style_fig(fig, height: int = 320, legend: bool = True):
+    grid = "rgba(148,163,184,0.12)"
     fig.update_layout(
         height=height, template=None, colorway=COLORWAY,
         paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
         font=dict(family="Inter, Segoe UI, sans-serif", color=COLORS["text"], size=12),
-        margin=dict(l=8, r=8, t=28, b=8), showlegend=legend,
-        legend=dict(orientation="h", y=1.12, x=0, font=dict(color=COLORS["muted"])),
-        hoverlabel=dict(bgcolor=COLORS["panel"], bordercolor=COLORS["border"]),
+        margin=dict(l=8, r=8, t=30, b=8), showlegend=legend, bargap=0.38,
+        legend=dict(orientation="h", y=1.14, x=1, xanchor="right",
+                    font=dict(color=COLORS["muted"], size=11)),
+        hoverlabel=dict(bgcolor="#0B1222", bordercolor=COLORS["border"],
+                        font=dict(family="Inter, Segoe UI, sans-serif", size=12)),
     )
-    fig.update_xaxes(gridcolor=COLORS["border"], zerolinecolor=COLORS["border"],
-                     linecolor=COLORS["border"], tickfont=dict(color=COLORS["muted"]))
-    fig.update_yaxes(gridcolor=COLORS["border"], zerolinecolor=COLORS["border"],
-                     linecolor=COLORS["border"], tickfont=dict(color=COLORS["muted"]))
+    fig.update_xaxes(gridcolor=grid, zeroline=False, showline=False,
+                     tickfont=dict(color=COLORS["muted"], size=11))
+    fig.update_yaxes(gridcolor=grid, zeroline=False, showline=False,
+                     tickfont=dict(color=COLORS["muted"], size=11))
+    try:   # rounded bars where the installed Plotly supports it
+        fig.update_traces(marker_cornerradius=6, selector=dict(type="bar"))
+    except Exception:
+        pass
     return fig
+
+
+def chart(fig) -> None:
+    st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
 
 
 def compact_money(v: float, currency: str = "R$ ") -> str:
