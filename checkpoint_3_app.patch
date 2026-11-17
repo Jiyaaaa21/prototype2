@@ -1,0 +1,129 @@
+diff --git a/app.py b/app.py
+index 9bcf5f8..79c17e1 100644
+--- a/app.py
++++ b/app.py
+@@ -32,7 +32,7 @@ from src.simulation.monthly_state_payload_builder import (
+     MonthlyStatePayloadBuilder,
+ )
+ 
+-from src.scenarios.scenario_orchestrator import ScenarioOrchestrator
++from src.scenarios.scenario_page import render_scenario_page
+ 
+ 
+ # --------------------------------------------------
+@@ -441,114 +441,7 @@ elif page == "Simulation Explorer":
+ 
+ elif page == "Scenario Analysis":
+ 
+-    st.title("Business Scenario Analysis")
+-
+-    st.write(
+-        "Evaluate a hypothetical product price adjustment "
+-        "using the existing scenario engine."
+-    )
+-
+-    st.warning(
+-        "This is a deterministic counterfactual scenario. "
+-        "It holds historical quantities constant and does not "
+-        "predict customer demand or price elasticity."
+-    )
+-
+-    adjustment = st.slider(
+-        "Product Price Adjustment (%)",
+-        min_value=-20.0,
+-        max_value=20.0,
+-        value=5.0,
+-        step=0.5,
+-    )
+-
+-    st.write(
+-        f"Selected price adjustment: **{adjustment:.1f}%**"
+-    )
+-
+-    if st.button("Run Scenario", type="primary"):
+-
+-        try:
+-            with st.spinner("Executing and validating scenario..."):
+-
+-                orchestrator = ScenarioOrchestrator(
+-                    products=data["products"],
+-                    order_items=data["items"],
+-                    orders=data["orders"],
+-                    customers=data["customers"],
+-                    category_translation=data["translation"],
+-                    output_dir=REPORT_DIR,
+-                )
+-
+-                result = orchestrator.run(
+-                    adjustment_rate=adjustment / 100,
+-                )
+-
+-                st.session_state["scenario_result"] = result
+-
+-            st.success("Scenario executed and independently validated.")
+-
+-        except Exception as error:
+-            st.error(f"Scenario execution failed: {error}")
+-
+-
+-    if "scenario_result" in st.session_state:
+-
+-        result = st.session_state["scenario_result"]
+-
+-        summary = result["execution_summary"]
+-
+-        st.divider()
+-
+-        st.subheader("Scenario Results")
+-
+-        if summary["status"] == "SUCCESS":
+-
+-            col1, col2, col3 = st.columns(3)
+-
+-            col1.metric(
+-                "Baseline Merchandise Value",
+-                f"R$ {summary['baseline_merchandise_value']:,.2f}",
+-            )
+-
+-            col2.metric(
+-                "Scenario Merchandise Value",
+-                f"R$ {summary['scenario_merchandise_value']:,.2f}",
+-            )
+-
+-            col3.metric(
+-                "Merchandise Value Change",
+-                f"R$ {summary['merchandise_value_change']:,.2f}",
+-            )
+-
+-            st.write(
+-                f"Scenario ID: **{summary['scenario_id']}**"
+-            )
+-
+-            st.write(
+-                f"Affected item lines: "
+-                f"**{summary['affected_item_lines']:,}**"
+-            )
+-
+-            st.success(
+-                f"Independent validation: "
+-                f"{summary['independent_validation']}"
+-            )
+-
+-            st.subheader("Six-Dimensional Impact Analysis")
+-
+-            impacts = result["scenario_results"]["impact"]
+-
+-            for dimension, frame in impacts.items():
+-
+-                with st.expander(
+-                    dimension.replace("_", " ").title()
+-                ):
+-                    st.dataframe(
+-                        frame,
+-                        use_container_width=True,
+-                        hide_index=True,
+-                    )
++    render_scenario_page(data, REPORT_DIR)
+ 
+ 
+ # --------------------------------------------------
